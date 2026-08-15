@@ -10,6 +10,7 @@ from app.config import Settings
 from app.db import Base, get_session
 from app.models import KBArticle, Ticket
 from app.services.llm import DraftService
+from app.services.loadguard import IncidentDeduplicator, LLMBudget
 from app.services.retrieval import KnowledgeBaseIndex
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -82,6 +83,12 @@ async def client(engine, settings, kb_index):
     app.dependency_overrides[get_session] = override_get_session
     app.state.kb_index = kb_index
     app.state.draft_service = DraftService(settings, available=True)
+    app.state.llm_budget = LLMBudget(
+        settings.llm_budget_rub, settings.llm_cost_per_call_rub
+    )
+    app.state.dedup = IncidentDeduplicator(
+        settings.dedup_similarity_threshold, settings.dedup_window_seconds
+    )
 
     # KB нужна и в БД для GET /kb
     async with factory() as session:

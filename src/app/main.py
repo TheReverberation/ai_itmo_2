@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.db import init_db, session_factory
 from app.models import KBArticle
 from app.services.llm import DraftService
+from app.services.loadguard import IncidentDeduplicator, LLMBudget
 from app.services.retrieval import KnowledgeBaseIndex
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -43,6 +44,13 @@ async def lifespan(app: FastAPI):
         app.state.kb_index = await build_kb_index(session)
     app.state.draft_service = DraftService(
         settings, available=not settings.llm_simulate_down
+    )
+    # предохранители пиковой нагрузки: ₽-бюджет LLM и дедупликация инцидентов
+    app.state.llm_budget = LLMBudget(
+        settings.llm_budget_rub, settings.llm_cost_per_call_rub
+    )
+    app.state.dedup = IncidentDeduplicator(
+        settings.dedup_similarity_threshold, settings.dedup_window_seconds
     )
     yield
 

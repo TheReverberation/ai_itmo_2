@@ -26,8 +26,9 @@ jobs:
         run: uv run pytest -q
 
       # прогон демо: пайплайн должен отрабатывать end-to-end без ключей,
-      # в обычном режиме и на пути деградации LLM
+      # в обычном режиме, на пути деградации LLM и на пиковой нагрузке
       - name: Демо-прогон, keyless
         run: |
           uv run python -m app.demo
           uv run python -m app.demo --llm-down
+          uv run python -m app.demo_spike

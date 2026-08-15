@@ -25,8 +25,16 @@ class Settings(BaseSettings):
     llm_breaker_reset_seconds: float = 30.0
     llm_daily_budget_calls: int = 1000
 
-    # политика решений (см. docs/architecture.md)
-    confidence_threshold: float = 0.55
+    # предохранители пиковой нагрузки (services/loadguard.py):
+    # ₽-бюджет LLM (исчерпан → retrieval-only черновик) и дедупликация инцидентов
+    llm_budget_rub: float = 300.0
+    llm_cost_per_call_rub: float = 3.0
+    dedup_similarity_threshold: float = 0.6
+    dedup_window_seconds: int = 600
+
+    # политика решений (см. docs/architecture.md); порог confidence выбран
+    # на demo-данных как компромисс «доля автоматизации vs ошибка» (docs/ml.md)
+    confidence_threshold: float = 0.65
     retrieval_threshold: float = 0.15
     # NoDecode: разбираем значение из окружения сами (см. валидатор ниже)
     never_auto_topics: Annotated[set[str], NoDecode] = {"payment"}

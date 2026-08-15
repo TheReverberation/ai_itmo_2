@@ -6,12 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_draft_service, get_kb_index
+from app.api.deps import get_dedup, get_draft_service, get_kb_index, get_llm_budget
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.models import Ticket
 from app.schemas import DecisionRead, TicketCreate, TicketRead
 from app.services.llm import DraftService
+from app.services.loadguard import IncidentDeduplicator, LLMBudget
 from app.services.pipeline import process_ticket
 from app.services.retrieval import KnowledgeBaseIndex
 
@@ -25,6 +26,8 @@ async def create_ticket(
     kb: KnowledgeBaseIndex = Depends(get_kb_index),
     llm: DraftService = Depends(get_draft_service),
     settings: Settings = Depends(get_settings),
+    dedup: IncidentDeduplicator = Depends(get_dedup),
+    budget: LLMBudget = Depends(get_llm_budget),
 ) -> DecisionRead:
     """Принимает тикет, прогоняет через пайплайн и возвращает решение."""
     ticket = Ticket(
@@ -44,7 +47,9 @@ async def create_ticket(
         raise HTTPException(
             status_code=409, detail="тикет с таким ticket_id уже существует"
         ) from exc
-    decision = await process_ticket(ticket, kb, llm, session, settings)
+    decision = await process_ticket(
+        ticket, kb, llm, session, settings, dedup=dedup, budget=budget
+    )
     return DecisionRead.from_decision(decision)
 
 
