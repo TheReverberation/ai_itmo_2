@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models import Decision, Ticket
+from app.services.classifier import classify
 from app.services.llm import DraftService
 from app.services.pii import mask_pii
 from app.services.pipeline import process_ticket
@@ -56,6 +57,36 @@ async def test_llm_down_degrades_gracefully(run_ticket):
     d = await run_ticket("t-005", llm_available=False)  # типовой тикет, LLM лежит
     assert d.action == "route_to_queue"
     assert "LLM недоступен" in d.reason
+
+
+async def test_prompt_injection_ticket_is_treated_as_data(run_ticket):
+    # t-008 содержит инструкцию для LLM и email; текст обращения уходит в промпт
+    # как данные (llm.py: _SYSTEM_PROMPT/_HUMAN_PROMPT), черновик строится только
+    # по статье KB. Реальные атаки на живой LLM не покрыты — см. SELF_REVIEW.
+    d = await run_ticket("t-008")
+    assert d.action == "auto_draft"
+    assert "email" in d.pii_masked  # PII замаскирован до классификации и LLM
+    assert "забудь" not in d.draft.lower()  # инструкция из тикета не исполнена
+    assert "admin@example.com" not in d.draft
+
+
+async def test_paraphrased_risky_ticket_evades_keyword_risk(seeded_session, kb_index, settings):
+    # честный негативный тест: перефразированный спор об оплате обходит
+    # keyword-детектор риска (известное ограничение — SELF_REVIEW), но защита
+    # в глубину не даёт автоответа: нет опоры на KB → тикет уходит оператору.
+    text = "Сняли оплату два раза за одну покупку, компенсируйте мне деньги."
+    cls = classify(text)
+    assert cls["risk"] == "low"  # детектор пропустил перефраз — задокументировано
+    assert cls["topic"] == "payment"
+
+    ticket = Ticket(ticket_id="t-adv", channel="chat", text=text)
+    seeded_session.add(ticket)
+    await seeded_session.commit()
+    d = await process_ticket(
+        ticket, kb_index, DraftService(settings), seeded_session, settings
+    )
+    assert d.action == "route_to_queue"  # автоответ пользователю не уходит
+    assert d.draft is None
 
 
 async def test_decisions_are_logged(run_ticket, seeded_session):
