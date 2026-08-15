@@ -14,6 +14,7 @@
 - **Accept rate черновиков** оператором (главный онлайн-прокси качества генерации).
 - **Доля эскалаций** по причинам (risky_topic / low_confidence / no_grounding / pii).
 - **Retrieval score**: средний и доля запросов ниже порога grounding.
+- **Дедупликация при инцидентах** (см. [architecture.md](architecture.md)): dedup ratio (тикетов на кластер), false-merge rate по выборочному аудиту (главный guardrail качества), time-to-first-status во время инцидента, cluster purity.
 - Регулярный офлайн-прогон на замороженном golden set (регрессия качества при обновлениях модели/промпта).
 
 ## Продуктовые / бизнес-метрики
