@@ -22,23 +22,23 @@ flowchart LR
         A4[Моб. приложение] --> GW
     end
 
-    GW[Ingest API / Gateway] --> N[Нормализация\nединая схема тикета]
-    N --> PII[PII-маскирование\nregex + NER, локально]
-    PII --> CLS[Классификатор\nтема + риск + confidence\nправила + лёгкая ML-модель]
+    GW[Ingest API / Gateway] --> N[Нормализация<br/>единая схема тикета]
+    N --> PII[PII-маскирование<br/>regex + NER, локально]
+    PII --> CLS[Классификатор<br/>тема + риск + confidence<br/>правила + лёгкая ML-модель]
 
-    CLS -->|"риск / low-confidence"| OPQ[Очередь операторов\nс приоритетом]
-    CLS -->|"типовой, безопасный"| Q[(Очередь генерации\nKafka/RabbitMQ)]
+    CLS -->|"риск / low-confidence"| OPQ[Очередь операторов<br/>с приоритетом]
+    CLS -->|"типовой, безопасный"| Q[(Очередь генерации<br/>Kafka/RabbitMQ)]
 
     Q --> W[Async worker]
-    W --> RET[Retrieval:\nбаза знаний + похожие тикеты\nvector store]
-    RET --> LLM[LLM API\nчерновик ответа]
-    LLM --> SAFE[Safety-проверки\nвыходные фильтры]
-    SAFE -->|suggest-режим| OP[Оператор:\nчерновик на подтверждение]
-    SAFE -->|"безопасная категория,\nhigh confidence"| AUTO[Автоответ\nпользователю]
+    W --> RET[Retrieval:<br/>база знаний + похожие тикеты<br/>vector store]
+    RET --> LLM[LLM API<br/>черновик ответа]
+    LLM --> SAFE[Safety-проверки<br/>выходные фильтры]
+    SAFE -->|suggest-режим| OP[Оператор:<br/>черновик на подтверждение]
+    SAFE -->|"безопасная категория,<br/>high confidence"| AUTO[Автоответ<br/>пользователю]
 
-    W -.->|"LLM недоступен:\ncircuit breaker"| OPQ
+    W -.->|"LLM недоступен:<br/>circuit breaker"| OPQ
 
-    CLS --> LOG[(Decision log\nappend-only)]
+    CLS --> LOG[(Decision log<br/>append-only)]
     SAFE --> LOG
     AUTO --> LOG
     OP --> LOG
