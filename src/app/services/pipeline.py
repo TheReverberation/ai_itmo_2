@@ -61,9 +61,9 @@ async def process_ticket(
                     decision.action = "auto_draft"
                     decision.draft = draft
                     decision.reason = "типовой тикет, высокая уверенность"
-            except LLMUnavailableError:
+            except LLMUnavailableError as exc:
                 decision.action = "route_to_queue"
-                decision.reason = ("LLM недоступен → graceful degradation: "
+                decision.reason = (f"LLM недоступен ({exc}) → graceful degradation: "
                                    "шаблон-подтверждение пользователю, тикет оператору")
 
     session.add(decision)

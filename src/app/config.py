@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     llm_model: str = "openai/gpt-4o-mini"
     llm_simulate_down: bool = False
 
+    # деградация: circuit breaker и дневной бюджет генерации (docs/monitoring.md)
+    llm_breaker_failure_threshold: int = 3
+    llm_breaker_reset_seconds: float = 30.0
+    llm_daily_budget_calls: int = 1000
+
     # политика решений (см. docs/architecture.md)
     confidence_threshold: float = 0.55
     retrieval_threshold: float = 0.15

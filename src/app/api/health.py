@@ -7,4 +7,10 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health(request: Request) -> dict:
-    return {"status": "ok", "llm_mode": request.app.state.draft_service.mode}
+    llm = request.app.state.draft_service
+    return {
+        "status": "ok",
+        "llm_mode": llm.mode,
+        "llm_breaker": "open" if llm.breaker_open else "closed",
+        "llm_calls_today": llm.calls_today,
+    }
