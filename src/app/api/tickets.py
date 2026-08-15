@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import get_draft_service, get_kb_index
+from app.config import Settings, get_settings
+from app.db import get_session
+from app.models import Ticket
+from app.schemas import DecisionRead, TicketCreate, TicketRead
+from app.services.llm import DraftService
+from app.services.pipeline import process_ticket
+from app.services.retrieval import KnowledgeBaseIndex
+
+router = APIRouter(tags=["tickets"])
+
+
+@router.post("/tickets", response_model=DecisionRead, status_code=201)
+async def create_ticket(
+    payload: TicketCreate,
+    session: AsyncSession = Depends(get_session),
+    kb: KnowledgeBaseIndex = Depends(get_kb_index),
+    llm: DraftService = Depends(get_draft_service),
+    settings: Settings = Depends(get_settings),
+) -> DecisionRead:
+    """Принимает тикет, прогоняет через пайплайн и возвращает решение."""
+    ticket = Ticket(
+        ticket_id=payload.ticket_id or f"t-{uuid.uuid4().hex[:8]}",
+        channel=payload.channel,
+        user_id=payload.user_id,
+        text=payload.text,
+        meta=payload.metadata,
+    )
+    session.add(ticket)
+    await session.flush()
+    decision = await process_ticket(ticket, kb, llm, session, settings)
+    return DecisionRead.from_decision(decision)
+
+
+@router.get("/tickets/{ticket_id}", response_model=TicketRead)
+async def get_ticket(
+    ticket_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> Ticket:
+    ticket = await session.get(Ticket, ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="тикет не найден")
+    return ticket

@@ -2,4 +2,7 @@ __pycache__/
 *.pyc
 .DS_Store
 ai_itmo_2.pdf
-poc/decision_log.jsonl
+.venv/
+.env
+app.db
+.pytest_cache/
