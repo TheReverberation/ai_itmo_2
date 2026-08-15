@@ -1,8 +1,9 @@
 """Юнит-тесты компонентов, которые до этого проверялись только через пайплайн:
-retrieval, PII-маскирование и классификатор — каждый на своём контракте.
+retrieval, PII-маскирование, классификатор и output gate — каждый на своём контракте.
 """
 from app.config import Settings
 from app.services.classifier import classify
+from app.services.llm import passes_output_gate
 from app.services.pii import mask_pii
 from app.services.retrieval import KnowledgeBaseIndex
 
@@ -60,3 +61,41 @@ def test_risk_is_detected_independently_of_topic():
     cls = classify("взломали аккаунт, не я заходил")
     assert cls["risk"] == "high"
     assert cls["risk_reasons"] == ["security"]
+
+
+def test_confidence_single_weak_hit_stays_below_threshold(settings):
+    # одиночное попадание — слабое свидетельство: 0.5 < порога → оператор
+    cls = classify("проблема с приложением")  # только «приложение»
+    assert cls["confidence"] == 0.5
+    assert cls["confidence"] < settings.confidence_threshold
+
+
+def test_confidence_clean_multi_hit_is_high(settings):
+    cls = classify("не могу войти, забыл пароль, как восстановить доступ")
+    assert cls["topic"] == "account_access"
+    assert cls["confidence"] >= settings.confidence_threshold
+
+
+def test_confidence_mixed_topics_are_penalized():
+    # попадания размазаны по темам → separation падает, уверенность ниже чистой
+    mixed = classify("оплата подписки не прошла, приложение вылетает с ошибкой")
+    clean = classify("приложение вылетает, не грузится, ошибка")
+    assert mixed["confidence"] < clean["confidence"]
+
+
+def test_output_gate_blocks_pii_placeholder_leak():
+    article = {"body": "Проверьте статус заказа в разделе Мои заказы."}
+    leaked = "Ваш заказ оформлен на [EMAIL], проверьте раздел Мои заказы."
+    assert not passes_output_gate(leaked, article)
+
+
+def test_output_gate_blocks_ungrounded_draft():
+    article = {"body": "Проверьте статус заказа в разделе Мои заказы."}
+    hallucination = "Compensation approved, transfer incoming."
+    assert not passes_output_gate(hallucination, article)
+
+
+def test_output_gate_passes_grounded_clean_draft():
+    article = {"body": "Проверьте статус заказа в разделе Мои заказы."}
+    ok = "Здравствуйте! Проверьте, пожалуйста, статус заказа в разделе Мои заказы."
+    assert passes_output_gate(ok, article)

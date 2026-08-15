@@ -29,8 +29,12 @@ def classify(masked_text: str) -> dict:
     if total_hits == 0:
         topic, confidence = "unknown", 0.0
     else:
-        # суррогат уверенности: доля попаданий в лучшую тему, прижатая к [0.3..0.95]
-        confidence = min(0.95, 0.3 + 0.65 * hits / max(3, total_hits + 1))
+        # калиброванный суррогат: отрыв лидера от конкурентов × объём сигнала.
+        # Одно слабое попадание → 0.5 (эскалация), чистые 2+ попадания → ~1.0;
+        # смешанные темы дают < порога и уходят оператору.
+        separation = hits / total_hits          # доля попаданий в лучшую тему
+        evidence = min(hits, 2) / 2             # одиночное попадание — слабое свидетельство
+        confidence = separation * evidence
 
     risk_reasons = [
         reason for reason, kws in RISK_KEYWORDS.items()

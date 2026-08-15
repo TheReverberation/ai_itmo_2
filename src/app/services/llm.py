@@ -12,6 +12,7 @@ LLMUnavailableError — пайплайн един для всех причин �
 """
 from __future__ import annotations
 
+import re
 import time
 from datetime import date
 
@@ -36,6 +37,38 @@ _HUMAN_PROMPT = (
 
 class LLMUnavailableError(Exception):
     """LLM недоступен — пайплайн деградирует до маршрутизации без черновика."""
+
+
+# Выходной gate: плейсхолдеры, которыми pii.mask_pii заменяет персональные данные.
+# Если такой маркер оказался в исходящем черновике — это утечка формата PII.
+_PII_PLACEHOLDER_RE = re.compile(r"\[(?:EMAIL|PHONE|CARD)\]")
+_TOKEN_RE = re.compile(r"[а-яёa-z0-9]+")
+
+
+def passes_output_gate(draft: str, article: dict) -> bool:
+    """Выходной safety/groundedness-гейт: черновик проверяется ПЕРЕД отдачей.
+
+    - PII: в черновике не должно быть плейсхолдеров [EMAIL]/[PHONE]/[CARD]
+      (модель могла процитировать маскированный текст обращения).
+    - Groundedness: черновик должен пересекаться по словам с телом KB-статьи —
+      иначе это «фантазия» вне grounding-контекста.
+    Не прошёл gate → эскалация оператору, не пользователю (pipeline.py).
+    """
+    if _PII_PLACEHOLDER_RE.search(draft):
+        return False
+    draft_tokens = set(_TOKEN_RE.findall(draft.lower()))
+    article_tokens = set(_TOKEN_RE.findall(article["body"].lower()))
+    return bool(draft_tokens & article_tokens)
+
+
+def retrieval_only_draft(article: dict) -> str:
+    """Шаблонный черновик из KB-статьи без LLM — ступень «retrieval-only»
+    лестницы деградации (исчерпан ₽-бюджет, см. docs/architecture.md)."""
+    return (
+        f"Здравствуйте! Похоже, ваш вопрос касается темы «{article['title']}». "
+        f"{article['body']} Если это не решит проблему — ответьте на это "
+        f"сообщение, и мы передадим обращение специалисту."
+    )
 
 
 class DraftService:
@@ -120,8 +153,4 @@ class DraftService:
 
     @staticmethod
     def _fake_draft(article: dict) -> str:
-        return (
-            f"Здравствуйте! Похоже, ваш вопрос касается темы «{article['title']}». "
-            f"{article['body']} Если это не решит проблему — ответьте на это "
-            f"сообщение, и мы передадим обращение специалисту."
-        )
+        return retrieval_only_draft(article)
