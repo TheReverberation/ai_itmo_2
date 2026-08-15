@@ -23,7 +23,7 @@ flowchart LR
     end
 
     GW[Ingest API / Gateway] --> N[Нормализация<br/>единая схема тикета]
-    N --> PII[PII-маскирование<br/>regex + NER, локально]
+    N --> PII[PII-маскирование<br/>Presidio: паттерны + NER, локально]
     PII --> CLS[Классификатор<br/>тема + риск + confidence<br/>правила + лёгкая ML-модель]
 
     CLS -->|"риск / low-confidence"| OPQ[Очередь операторов<br/>с приоритетом]
