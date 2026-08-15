@@ -53,4 +53,5 @@ python3 -m unittest discover poc -v   # smoke-тесты (6 шт.)
 - [docs/risks-and-ops.md](docs/risks-and-ops.md) — highload, privacy, safety
 - [docs/product.md](docs/product.md) — эскиз продуктовой части: гипотезы, метрики, эффект (опционально для «ИИ»)
 - [AI_USAGE.md](AI_USAGE.md) — роль AI в работе, включая его ошибки
+- [WORKLOG.md](WORKLOG.md) — тайм-бокс и управление скоупом (опционально для «ИИ»)
 - [SELF_REVIEW.md](SELF_REVIEW.md) — слабые места и критерии остановки проекта
