@@ -51,5 +51,6 @@ python3 -m unittest discover poc -v   # smoke-тесты (6 шт.)
 - [docs/ml.md](docs/ml.md) — каскад правила→ML→LLM, baselines, данные и валидация
 - [docs/monitoring.md](docs/monitoring.md) — метрики, дрейф vs деградация, алерты, стоимость LLM
 - [docs/risks-and-ops.md](docs/risks-and-ops.md) — highload, privacy, safety
+- [docs/product.md](docs/product.md) — эскиз продуктовой части: гипотезы, метрики, эффект (опционально для «ИИ»)
 - [AI_USAGE.md](AI_USAGE.md) — роль AI в работе, включая его ошибки
 - [SELF_REVIEW.md](SELF_REVIEW.md) — слабые места и критерии остановки проекта
