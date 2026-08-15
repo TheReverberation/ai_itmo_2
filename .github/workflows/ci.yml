@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Установить uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Синхронизировать зависимости по uv.lock
+        run: uv sync --frozen
+
+      - name: Линт (ruff)
+        run: uv run ruff check .
+
+      - name: Тесты (pytest)
+        run: uv run pytest -q
+
+      # прогон демо: пайплайн должен отрабатывать end-to-end без ключей,
+      # в обычном режиме и на пути деградации LLM
+      - name: Демо-прогон, keyless
+        run: |
+          uv run python -m app.demo
+          uv run python -m app.demo --llm-down

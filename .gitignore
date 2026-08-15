@@ -6,3 +6,4 @@ ai_itmo_2.pdf
 .env
 app.db
 .pytest_cache/
+.ruff_cache/

@@ -1,5 +1,7 @@
 # Автоматизация обработки тикетов поддержки — System Design + PoC
 
+[![CI](https://github.com/TheReverberation/ai_itmo_2/actions/workflows/ci.yml/badge.svg)](https://github.com/TheReverberation/ai_itmo_2/actions/workflows/ci.yml)
+
 Отборочное задание (Задание 2, System Design), программа «Искусственный интеллект».
 
 ## Что делает решение
@@ -19,7 +21,10 @@ uv sync                              # зависимости + venv
 uv run python -m app.demo            # happy path + эскалации на 8 mock-тикетах
 uv run python -m app.demo --llm-down # fallback: имитация недоступности LLM API
 uv run pytest -v                     # тесты (пайплайн + API)
+uv run ruff check .                  # линт
 ```
+
+Те же три шага плюс оба демо-прогона гоняет CI на каждый push и PR ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 API-сервис (FastAPI, Swagger на `/docs`):
 
