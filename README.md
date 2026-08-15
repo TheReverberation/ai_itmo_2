@@ -15,9 +15,9 @@
 Требуется только Python 3.10+ (стандартная библиотека, без pip install):
 
 ```bash
-python3 poc/demo.py            # happy path + эскалации на 6 mock-тикетах
+python3 poc/demo.py            # happy path + эскалации на 7 mock-тикетах
 python3 poc/demo.py --llm-down # fallback: имитация недоступности LLM API
-python3 -m unittest discover poc -v   # smoke-тесты (6 шт.)
+python3 -m unittest discover poc -v   # smoke-тесты (7 шт.)
 ```
 
 ## Какой сценарий демонстрируется
@@ -25,7 +25,8 @@ python3 -m unittest discover poc -v   # smoke-тесты (6 шт.)
 1. Типовой тикет («забыл пароль») → PII маскируется → тема определена → найдена статья KB → mock-LLM формирует черновик → решение в decision log (**happy path**).
 2. Рискованный тикет (двойное списание, номер карты, угроза жалобой) → `risk=high` → **эскалация оператору без генерации ответа** (**risky path**).
 3. Бессодержательный тикет → low confidence → эскалация.
-4. `--llm-down` → circuit-breaker-поведение: классификация и маршрутизация работают, черновики не генерируются, тикеты уходят операторам (**fallback path**).
+4. Нейтральный платёжный вопрос («где посмотреть чек») → черновик генерируется, но категория из списка «только с оператором» → **suggest-режим**: черновик уходит оператору на подтверждение, не пользователю.
+5. `--llm-down` → circuit-breaker-поведение: классификация и маршрутизация работают, черновики не генерируются, тикеты уходят операторам (**fallback path**).
 
 ## Что реализовано, а что — архитектурный дизайн
 
@@ -33,9 +34,9 @@ python3 -m unittest discover poc -v   # smoke-тесты (6 шт.)
 |---|---|---|
 | PII-маскирование | regex | regex + локальный NER |
 | Классификация темы/риска + confidence | ключевые слова, суррогатный confidence | классическая ML-модель на исторической разметке, калиброванные пороги |
-| Retrieval по базе знаний | TF-IDF (stdlib), 5 статей | embedding-модель + vector store |
+| Retrieval по базе знаний | TF-IDF (stdlib), 6 статей | embedding-модель + vector store |
 | Черновик ответа | шаблонный mock-LLM | внешний LLM API (вход только маскированный) |
-| Эскалация риска / low-confidence, decision log (JSONL) | in-process | политика как сервис, append-only хранилище |
+| Эскалация риска / low-confidence, suggest-режим для категорий «только с оператором», decision log (JSONL) | in-process | политика как сервис, append-only хранилище |
 | — | вызовы синхронные | очередь (Kafka/RabbitMQ), воркеры, backpressure, дедупликация инцидентов |
 
 ## Допущения и ограничения

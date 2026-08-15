@@ -1,5 +1,6 @@
 """Smoke-тесты PoC: happy path, обязательная эскалация рискованного тикета,
-low-confidence, PII-маскирование и деградация при недоступном LLM.
+low-confidence, PII-маскирование, suggest-режим для категорий «только
+с оператором» и деградация при недоступном LLM.
 
 Запуск: python3 -m unittest discover poc
 """
@@ -50,6 +51,12 @@ class SmokeTest(unittest.TestCase):
         masked, found = mask_pii(self.tickets["t-002"]["text"])
         self.assertIn("card", found)
         self.assertNotIn("4276", masked)
+
+    def test_never_auto_topic_goes_to_suggest_not_auto(self):
+        d = self.run_ticket("t-007")  # нейтральный платёжный вопрос (где чек)
+        self.assertEqual(d["action"], "suggest_to_operator")
+        self.assertEqual(d["topic"], "payment")
+        self.assertIsNotNone(d["draft"])  # черновик есть, но уходит оператору, не пользователю
 
     def test_llm_down_degrades_gracefully(self):
         d = self.run_ticket("t-005", llm_available=False)  # типовой тикет, LLM лежит
