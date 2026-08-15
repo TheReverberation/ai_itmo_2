@@ -176,7 +176,7 @@ sequenceDiagram
 | Компонент | В PoC (реализовано) | В целевой архитектуре |
 |---|---|---|
 | Ingestion | FastAPI `POST /tickets` | HTTP API + очередь |
-| PII-маскирование | Presidio: pattern-рекогнайзеры (email/телефон/карта с Luhn), без NER | Presidio + NER-модель |
+| PII-маскирование | Presidio: pattern-распознаватели (email/телефон/карта с Luhn), без NER | Presidio + NER-модель |
 | Классификатор | правила по ключевым словам + калиброванный confidence | лёгкая ML-модель (см. [ml.md](ml.md)) |
 | Retrieval | TF-IDF по локальной мини-KB | embeddings + pgvector/Qdrant |
 | LLM | LangChain + OpenRouter (keyless — детерминированный fake) + промпт-изоляция + выходной gate (PII/groundedness) | LLM API за circuit breaker; adversarial-тесты, LLM-judge groundedness |
