@@ -22,7 +22,7 @@ async def test_post_ticket_happy_path(client):
 
 
 async def test_post_risky_ticket_escalates_and_pii_never_leaks(client):
-    card = "4276 1234 5678 9012"
+    card = "4276 1234 5678 9014"  # Luhn-валидный: Presidio проверяет контрольную сумму
     resp = await client.post("/tickets", json={
         "channel": "email",
         "text": f"С карты {card} списали дважды, верните деньги, иначе жалобу подам!",
@@ -31,6 +31,7 @@ async def test_post_risky_ticket_escalates_and_pii_never_leaks(client):
     d = resp.json()
     assert d["action"] == "escalate_to_operator"
     assert d["risk"] == "high"
+    assert "card" in d["pii_masked"]
     assert "4276" not in resp.text  # номер карты не утёк в ответ
 
 
