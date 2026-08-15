@@ -17,16 +17,18 @@
 ```bash
 python3 poc/demo.py              # happy path + risky path на 7 mock-тикетах
 python3 poc/demo.py --llm-down   # fallback: LLM API недоступен
-python3 -m unittest discover poc -v   # smoke-тесты (7 шт.)
+python3 poc/demo_loadguard.py    # пик нагрузки: дедупликация инцидента + бюджет LLM
+python3 -m unittest discover poc -v   # smoke-тесты (19 шт.)
 ```
 
 Результаты: `poc/out/audit_log.jsonl` (лог решений), `poc/out/operator_inbox.jsonl` (очередь оператора).
 
 ## Какой сценарий демонстрируется
 
-1. **Happy path**: типовой тикет про доставку → PII-маскирование → классификация (`delivery`, high confidence) → retrieval релевантной статьи KB → черновик ответа в очередь оператора (suggest-режим) → запись в audit log.
+1. **Happy path**: типовой тикет про доставку → PII-маскирование → классификация (`delivery`, high confidence) → retrieval релевантной статьи KB → черновик проходит выходной safety/groundedness-gate → черновик ответа в очередь оператора (suggest-режим) → запись в audit log.
 2. **Risky path**: тикет про двойное списание с номером карты → PII замаскирован → категория `payment` из risk-списка → эскалация оператору **без** генерации автоответа.
 3. **Fallback**: при `--llm-down` генерация деградирует до retrieval-only ответа (ссылки на KB) или эскалации — приём и классификация не страдают.
+4. **Пик нагрузки** (`demo_loadguard.py`): всплеск из 17 тикетов об одном сбое доставки схлопывается в кластер — LLM вызывается один раз для лидера, 14 последователей переиспользуют его ответ без генерации; при исчерпании бюджета LLM генерация деградирует до retrieval-only.
 
 ## Что реализовано, а что — дизайн
 
@@ -35,8 +37,9 @@ python3 -m unittest discover poc -v   # smoke-тесты (7 шт.)
 | PII-маскирование (regex) | + NER-модель |
 | Классификатор правил + confidence | TF-IDF+логрег → лёгкий transformer |
 | TF-IDF retrieval по мини-KB | embeddings + pgvector/Qdrant |
-| Mock-LLM (шаблоны) с флагом недоступности | LLM API за circuit breaker и бюджетом |
+| Mock-LLM (шаблоны) + промпт-изоляция + выходной gate (PII/groundedness) | LLM API за circuit breaker; adversarial-тесты, LLM-judge groundedness |
 | Последовательные вызовы | очереди Kafka/RabbitMQ, sync/async разделение |
+| Дедуп (Jaccard) + бюджет LLM (счётчик) | embeddings+LSH кластеризация, распределённый бюджет в Redis |
 | JSONL audit log и operator inbox | append-only хранилище, интеграция с helpdesk |
 
 ## Допущения и ограничения

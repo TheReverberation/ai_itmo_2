@@ -17,6 +17,7 @@ from pathlib import Path
 from .audit import AuditLog
 from .classifier import classify
 from .generator import generate_draft
+from .loadguard import IncidentDeduplicator, LLMBudget
 from .pii import mask_pii
 from .retrieval import KnowledgeBase
 
@@ -26,12 +27,17 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "out"
 
 class TicketPipeline:
     def __init__(self, kb_path: Path | None = None, out_dir: Path | None = None,
-                 llm_available: bool = True):
+                 llm_available: bool = True,
+                 budget: LLMBudget | None = None,
+                 deduplicator: IncidentDeduplicator | None = None):
         self.kb = KnowledgeBase(kb_path or DATA_DIR / "kb.json")
         out = Path(out_dir or OUT_DIR)
         self.audit = AuditLog(out / "audit_log.jsonl")
         self.operator_inbox = AuditLog(out / "operator_inbox.jsonl")
         self.llm_available = llm_available
+        # Опциональные предохранители пиковой нагрузки (см. loadguard.py).
+        self.budget = budget
+        self.deduplicator = deduplicator
 
     def process(self, ticket: dict) -> dict:
         """Обрабатывает тикет, возвращает итоговое решение."""
@@ -59,12 +65,43 @@ class TicketPipeline:
             self.audit.write(decision)
             return decision
 
+        # Дедупликация при инцидентах: если тикет — «последователь» уже
+        # известного кластера с готовым ответом, переиспользуем его БЕЗ LLM.
+        if self.deduplicator is not None:
+            dd = self.deduplicator.assign(ticket["id"], cls.topic, masked_text)
+            decision.update(cluster_id=dd.cluster_id, cluster_size=dd.cluster_size)
+            if not dd.is_leader and dd.cached_answer is not None:
+                decision.update(action="draft_for_operator", draft=dd.cached_answer,
+                                kb_source=None, generator_status="dedup_cached")
+                self.operator_inbox.write(
+                    {"ticket_id": ticket["id"], "masked_text": masked_text,
+                     "topic": cls.topic, "draft": dd.cached_answer,
+                     "cluster_id": dd.cluster_id, "note": "dedup_cached"}
+                )
+                self.audit.write(decision)
+                return decision
+
         # 3. Retrieval (в целевой архитектуре — асинхронно).
         results = self.kb.search(masked_text, top_k=1)
         score, article = results[0] if results else (0.0, None)
 
-        # 4. Черновик ответа (mock-LLM с флагом доступности).
-        gen = generate_draft(cls.topic, article, score, self.llm_available)
+        # Бюджет LLM: если денег на вызов не хватает, деградируем до
+        # retrieval-only (флаг llm_available=False для этого тикета).
+        llm_ok = self.llm_available
+        if self.budget is not None and not self.budget.can_spend():
+            llm_ok = False
+            decision["budget_exhausted"] = True
+
+        # 4. Черновик ответа (mock-LLM с флагом доступности/бюджета).
+        # masked_text передаём для изоляции в промпте (см. generator._build_prompt).
+        gen = generate_draft(cls.topic, article, score, llm_ok, masked_text)
+        # Списываем бюджет только за реальный LLM-вызов (draft_ready).
+        if self.budget is not None and gen["status"] == "draft_ready":
+            self.budget.charge()
+        # Лидер кластера кэширует свой ответ для последователей.
+        if self.deduplicator is not None and gen.get("draft"):
+            self.deduplicator.set_answer(decision["cluster_id"], gen["draft"])
+
         if gen["status"] in ("draft_ready", "fallback_retrieval_only"):
             # Suggest-режим: черновик уходит оператору на подтверждение,
             # автоотправка пользователю — только на этапе 3 раскатки.

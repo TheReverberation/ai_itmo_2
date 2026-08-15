@@ -151,7 +151,7 @@ sequenceDiagram
 | PII-маскирование | regex-правила | regex + NER-модель |
 | Классификатор | правила по ключевым словам + confidence | лёгкая ML-модель (см. ml.md) |
 | Retrieval | TF-IDF по локальной мини-KB | embeddings + pgvector/Qdrant |
-| LLM | шаблонный mock-генератор | LLM API за circuit breaker |
+| LLM | шаблонный mock-генератор + промпт-изоляция + выходной gate (PII/groundedness) | LLM API за circuit breaker; adversarial-тесты, LLM-judge groundedness |
 | Очереди | вызовы функций по порядку | Kafka/RabbitMQ |
 | Audit log | JSONL-файл | append-only таблица/S3 |
 | Оператор | запись в operator-inbox JSONL | интеграция с helpdesk |
