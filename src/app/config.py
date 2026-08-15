@@ -1,9 +1,12 @@
 """Конфигурация приложения через переменные окружения / .env."""
 from __future__ import annotations
 
+import json
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -25,7 +28,19 @@ class Settings(BaseSettings):
     # политика решений (см. docs/architecture.md)
     confidence_threshold: float = 0.55
     retrieval_threshold: float = 0.15
-    never_auto_topics: set[str] = {"payment"}
+    # NoDecode: разбираем значение из окружения сами (см. валидатор ниже)
+    never_auto_topics: Annotated[set[str], NoDecode] = {"payment"}
+
+    @field_validator("never_auto_topics", mode="before")
+    @classmethod
+    def _accept_comma_separated(cls, value: object) -> object:
+        # в .env привычнее «payment,legal», чем JSON-список: принимаем оба вида,
+        # иначе привычная запись роняет старт невнятной SettingsError
+        if isinstance(value, str):
+            if value.lstrip().startswith("["):
+                return json.loads(value)
+            return {item.strip() for item in value.split(",") if item.strip()}
+        return value
 
 
 @lru_cache

@@ -1,6 +1,7 @@
 """Юнит-тесты компонентов, которые до этого проверялись только через пайплайн:
 retrieval, PII-маскирование и классификатор — каждый на своём контракте.
 """
+from app.config import Settings
 from app.services.classifier import classify
 from app.services.pii import mask_pii
 from app.services.retrieval import KnowledgeBaseIndex
@@ -43,6 +44,15 @@ def test_classifier_reports_zero_confidence_when_nothing_matched():
     cls = classify("абракадабра")
     assert cls["topic"] == "unknown"
     assert cls["confidence"] == 0.0  # пайплайн эскалирует такой тикет
+
+
+def test_never_auto_topics_accepts_both_env_forms(monkeypatch):
+    # в .env пишут «payment,legal», в JSON-виде — ["payment","legal"]; работать
+    # должны оба, иначе опечатка в конфиге роняет старт с невнятной ошибкой
+    monkeypatch.setenv("NEVER_AUTO_TOPICS", "payment, legal")
+    assert Settings(_env_file=None).never_auto_topics == {"payment", "legal"}
+    monkeypatch.setenv("NEVER_AUTO_TOPICS", '["payment","legal"]')
+    assert Settings(_env_file=None).never_auto_topics == {"payment", "legal"}
 
 
 def test_risk_is_detected_independently_of_topic():
