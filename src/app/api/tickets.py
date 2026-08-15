@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_draft_service, get_kb_index
@@ -34,7 +35,15 @@ async def create_ticket(
         meta=payload.metadata,
     )
     session.add(ticket)
-    await session.flush()
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # клиентский ticket_id уже занят (например, повторная отправка) — 409,
+        # а не 500; идемпотентный replay — задача продовой интеграции (SELF_REVIEW)
+        await session.rollback()
+        raise HTTPException(
+            status_code=409, detail="тикет с таким ticket_id уже существует"
+        ) from exc
     decision = await process_ticket(ticket, kb, llm, session, settings)
     return DecisionRead.from_decision(decision)
 

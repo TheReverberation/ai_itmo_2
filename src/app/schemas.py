@@ -2,11 +2,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
+if TYPE_CHECKING:  # только для аннотаций: схемы не зависят от ORM в рантайме
+    from app.models import Decision
+
 
 class TicketCreate(BaseModel):
+    # строки обрезаются по краям: текст из одних пробелов — это пустой тикет (422)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     text: str = Field(min_length=1)
     channel: str = "api"
     ticket_id: str | None = None
@@ -58,7 +65,7 @@ class DecisionRead(BaseModel):
     reason: str
 
     @classmethod
-    def from_decision(cls, d) -> "DecisionRead":
+    def from_decision(cls, d: Decision) -> DecisionRead:
         kb = None
         if d.kb_article_id is not None:
             kb = KBArticleHit(id=d.kb_article_id, title=d.kb_title, score=d.kb_score)

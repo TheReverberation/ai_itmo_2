@@ -35,7 +35,8 @@ class KnowledgeBaseIndex:
     @staticmethod
     def _cosine(a: dict, b: dict) -> float:
         dot = sum(v * b.get(k, 0.0) for k, v in a.items())
-        na, nb = math.sqrt(sum(v * v for v in a.values())), math.sqrt(sum(v * v for v in b.values()))
+        na = math.sqrt(sum(v * v for v in a.values()))
+        nb = math.sqrt(sum(v * v for v in b.values()))
         return dot / (na * nb) if na and nb else 0.0
 
     def search(self, text: str) -> tuple[dict | None, float]:

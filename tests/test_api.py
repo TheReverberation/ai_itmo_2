@@ -51,6 +51,20 @@ async def test_kb_listed(client):
     assert len(resp.json()) == 6
 
 
+async def test_duplicate_ticket_id_is_conflict_not_error(client):
+    payload = {"text": "Не могу войти, забыл пароль", "ticket_id": "t-dup"}
+    assert (await client.post("/tickets", json=payload)).status_code == 201
+    resp = await client.post("/tickets", json=payload)
+    assert resp.status_code == 409  # не 500: конфликт клиентского идентификатора
+    decisions = (await client.get("/decisions")).json()
+    assert len(decisions) == 1  # отклонённый повтор не оставил второго решения
+
+
+async def test_blank_text_is_rejected(client):
+    resp = await client.post("/tickets", json={"text": "   \n "})
+    assert resp.status_code == 422  # пробелы обрезаются → пустой текст не тикет
+
+
 async def test_get_ticket_and_404(client):
     created = await client.post(
         "/tickets", json={"text": "как отменить подписку", "ticket_id": "t-x1"}

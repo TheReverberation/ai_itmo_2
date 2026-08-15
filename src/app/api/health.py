@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends
+
+from app.api.deps import get_draft_service
+from app.services.llm import DraftService
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-async def health(request: Request) -> dict:
-    llm = request.app.state.draft_service
+async def health(llm: DraftService = Depends(get_draft_service)) -> dict:
     return {
         "status": "ok",
         "llm_mode": llm.mode,
